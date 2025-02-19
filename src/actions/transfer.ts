@@ -12,19 +12,21 @@ import {
     generateObject,
 } from "@elizaos/core";
 import type { KeyPairString } from "near-api-js/lib/utils";
-import { Bitcoin, NearNetworkIds, signAndSend } from "multichain-tools";
+import { Bitcoin, EVM, signAndSend } from "multichain-tools";
 import { KeyPair } from "near-api-js";
 import { z, type ZodType } from "zod";
-import { BITCOIN_CONFIGS, parseBTC } from "../utils/multichain";
+import { getBitcoinConfig, getDerivationPath, getEvmConfig, parseBTC, parseETH } from "../utils/multichain";
 
 export interface TransferContent extends Content {
     recipient: string;
     amount: string | number;
+    symbol: string;
 }
 
-export const BtcTransferSchema: ZodType = z.object({
+export const TransferSchema: ZodType = z.object({
     recipient: z.string(),
     amount: z.string().or(z.number()),
+    symbol: z.enum(["BTC", "ETH"]),
 });
 
 function isTransferContent(
@@ -34,7 +36,8 @@ function isTransferContent(
     return (
         typeof (content as TransferContent).recipient === "string" &&
         (typeof (content as TransferContent).amount === "string" ||
-            typeof (content as TransferContent).amount === "number")
+            typeof (content as TransferContent).amount === "number") &&
+        typeof (content as TransferContent).symbol === "string"
     );
 }
 
@@ -45,6 +48,7 @@ Example response:
 {
     "recipient": "tb1qc3m2lp0e23f9s30ajh3fpj5qm2h4j2z50xev47",
     "amount": "0.001",
+    "symbol: "BTC",
 }
 \`\`\`
 
@@ -55,8 +59,9 @@ Given the recent messages and wallet information below:
 {{walletInfo}}
 
 Extract the following information about the requested token transfer:
-- Recipient address (BTC account)
+- Recipient address
 - Amount to transfer
+- Symbol of the token to transfer
 
 Respond with a JSON markdown block containing only the extracted values.`;
 
@@ -69,14 +74,13 @@ async function transferBTC(
     const secretKey = runtime.getSetting("NEAR_WALLET_SECRET_KEY");
 
     if (!accountId || !secretKey) {
-        throw new Error("BTC wallet credentials not configured");
+        throw new Error("NEAR wallet credentials not configured");
     }
 
-    const networkId = runtime.getSetting("NEAR_NETWORK") as NearNetworkIds || "testnet";
-    const bitcoinConfig = BITCOIN_CONFIGS[networkId];
-    const bitcoin = new Bitcoin(bitcoinConfig);
+    const config = getBitcoinConfig(runtime);
+    const bitcoin = new Bitcoin(config);
 
-    const derivationPath = "bitcoin-1";
+    const derivationPath = getDerivationPath("BTC");
     const { address, publicKey } = await bitcoin.deriveAddressAndPublicKey(accountId, derivationPath);
 
     const response = await signAndSend.keyPair.signAndSendBTCTransaction({
@@ -87,13 +91,13 @@ async function transferBTC(
             publicKey: publicKey,
         },
         chainConfig: {
-            network: bitcoinConfig.network,
-            providerUrl: bitcoinConfig.providerUrl,
-            contract: bitcoinConfig.contract,
+            network: config.network,
+            providerUrl: config.providerUrl,
+            contract: config.contract,
         },
         nearAuthentication: {
             accountId: accountId,
-            networkId: bitcoinConfig.nearNetworkId,
+            networkId: config.nearNetworkId,
         },
         derivationPath,
     }, KeyPair.fromString(secretKey as KeyPairString));
@@ -105,13 +109,71 @@ async function transferBTC(
     }
 }
 
+async function transferEth(
+    runtime: IAgentRuntime,
+    recipient: string,
+    amount: string
+): Promise<string> {
+    const accountId = runtime.getSetting("NEAR_ADDRESS");
+    const secretKey = runtime.getSetting("NEAR_WALLET_SECRET_KEY");
+
+    if (!accountId || !secretKey) {
+        throw new Error("NEAR wallet credentials not configured");
+    }
+
+    const config = getEvmConfig(runtime);
+    const evm = new EVM(config);
+
+    const derivationPath = getDerivationPath("EVM");
+    const { address } = await evm.deriveAddressAndPublicKey(accountId, derivationPath);
+
+    const response = await signAndSend.keyPair.signAndSendEVMTransaction({
+        transaction: {
+            to: recipient,
+            value: parseETH(Number(amount)).toFixed(),
+            from: address,
+        },
+        chainConfig: {
+            providerUrl: config.providerUrl,
+            contract: config.contract,
+        },
+        nearAuthentication: {
+            accountId: accountId,
+            networkId: config.nearNetworkId,
+        },
+        derivationPath,
+    }, KeyPair.fromString(secretKey as KeyPairString));
+
+    if (response.success) {
+        return response.transactionHash;
+    } else {
+        throw new Error(`Transfer ETH failed with error: ${response.errorMessage}`);
+    }
+}
+
+async function transfer(
+    runtime: IAgentRuntime,
+    symbol: string,
+    recipient: string,
+    amount: string
+): Promise<string> {
+    switch (symbol) {
+        case "BTC":
+            return transferBTC(runtime, recipient, amount);
+        case "ETH":
+            return transferEth(runtime, recipient, amount);
+        default:
+            throw new Error(`Unsupported symbol to transfer: ${symbol}`);
+    }
+}
+
 export const executeBtcTransfer: Action = {
-    name: "SEND_BTC",
-    similes: ["TRANSFER_BTC", "PAY_BTC"],
+    name: "MULTI_CHAIN_TRANSFER_TOKEN",
+    similes: ["MULTI_CHAIN_SEND_TOKEN", "MULTI_CHAIN_PAY_TOKEN"],
     validate: async (_runtime: IAgentRuntime, _message: Memory) => {
         return true; // Add your validation logic here
     },
-    description: "Transfer BTC to another account",
+    description: "Transfer tokens to another account on the same chain",
     handler: async (
         runtime: IAgentRuntime,
         message: Memory,
@@ -139,12 +201,12 @@ export const executeBtcTransfer: Action = {
             runtime,
             context: transferContext,
             modelClass: ModelClass.SMALL,
-            schema: BtcTransferSchema,
+            schema: TransferSchema,
         });
 
         // Validate transfer content
         if (!isTransferContent(runtime, content)) {
-            elizaLogger.error("Invalid content for TRANSFER_BTC action:", content);
+            elizaLogger.error("Invalid content for MULTI_CHAIN_TRANSFER_TOKEN action:", content);
             if (callback) {
                 callback({
                     text: "Unable to process transfer request. Invalid content provided.",
@@ -155,15 +217,16 @@ export const executeBtcTransfer: Action = {
         }
 
         try {
-            const txHash = await transferBTC(
+            const txHash = await transfer(
                 runtime,
+                content.symbol,
                 content.recipient,
                 content.amount.toString()
             );
 
             if (callback) {
                 callback({
-                    text: `Successfully transferred ${content.amount} BTC to ${content.recipient}\nTransaction: ${txHash}`,
+                    text: `Successfully transferred ${content.amount} ${content.symbol} to ${content.recipient}\nTransaction: ${txHash}`,
                     content: {
                         success: true,
                         signature: txHash,
@@ -175,10 +238,10 @@ export const executeBtcTransfer: Action = {
 
             return true;
         } catch (error) {
-            elizaLogger.error(`Error during BTC transfer: ${error}`);
+            elizaLogger.error(`Error during ${content.symbol} transfer: ${error}`);
             if (callback) {
                 callback({
-                    text: `Error transferring BTC: ${error}`,
+                    text: `Error transferring ${content.symbol}: ${error}`,
                     content: { error: error },
                 });
             }
@@ -197,7 +260,7 @@ export const executeBtcTransfer: Action = {
             {
                 user: "{{user2}}",
                 content: {
-                    text: "I'll send 0.0001 BTC now...",
+                    text: "I'll send 0.001 ETH now...",
                     action: "SEND_BTC",
                 },
             },

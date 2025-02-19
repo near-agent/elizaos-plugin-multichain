@@ -5,9 +5,10 @@ import {
     type State,
     elizaLogger,
 } from "@elizaos/core";
-import { Bitcoin, type NearNetworkIds } from "multichain-tools";
+import { Bitcoin, EVM } from "multichain-tools";
 import NodeCache from "node-cache";
-import { BITCOIN_CONFIGS } from "../utils/multichain";
+import { getBitcoinConfig, getDerivationPath, getEvmConfig } from "../utils/multichain";
+import { DerivedAddresses } from "../types";
 
 export class DerivedAddressProvider implements Provider {
     private cache: NodeCache;
@@ -20,27 +21,36 @@ export class DerivedAddressProvider implements Provider {
         runtime: IAgentRuntime,
         _message: Memory,
         _state?: State
-    ): Promise<string | null> {
+    ): Promise<DerivedAddresses | null> {
         return this.getDerivedAddress(runtime);
     }
 
-    async getDerivedAddress(runtime: IAgentRuntime): Promise<string | null> {
+    async getDerivedAddress(runtime: IAgentRuntime): Promise<DerivedAddresses | null> {
         try {
-            const cacheKey = `derived-address-bitcoin-${this.accountId}`;
-            const cachedValue = this.cache.get<string>(cacheKey);
+            const cacheKey = `derived-addresses-${this.accountId}`;
+            const cachedValue = this.cache.get<DerivedAddresses>(cacheKey);
     
             if (cachedValue) {
                 elizaLogger.log("Cache hit for fetchPortfolioValue");
                 return cachedValue;
             }
 
-            const networkId = runtime.getSetting("NEAR_NETWORK") as NearNetworkIds || "testnet";
-            const bitcoin = new Bitcoin(BITCOIN_CONFIGS[networkId]);
-            const { address } = await bitcoin.deriveAddressAndPublicKey(this.accountId, "bitcoin-1");
+            // get BTC derived address
+            const bitcoin = new Bitcoin(getBitcoinConfig(runtime));
+            const { address: btcAddress } = await bitcoin.deriveAddressAndPublicKey(this.accountId, getDerivationPath("BTC"));
 
-            this.cache.set(cacheKey, address);
+            // get EVM derived address
+            const evm = new EVM(getEvmConfig(runtime));
+            const { address: evmAddress } = await evm.deriveAddressAndPublicKey(this.accountId, getDerivationPath("EVM"));
 
-            return address;
+            const addresses = {
+                btc: btcAddress,
+                evm: evmAddress,
+            };
+            elizaLogger.info(`Chain Signatures derived addresses:`, addresses);
+            this.cache.set(cacheKey, addresses);
+
+            return addresses;
         } catch (error) {
             elizaLogger.error(`Error in derived address provider: ${error}`);
             return null;
@@ -53,7 +63,7 @@ const walletProvider: Provider = {
         runtime: IAgentRuntime,
         _message: Memory,
         _state?: State
-    ): Promise<string | null> => {
+    ): Promise<DerivedAddresses | null> => {
         try {
             const accountId = runtime.getSetting("NEAR_ADDRESS");
             if (!accountId) {
