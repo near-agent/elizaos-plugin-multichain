@@ -17,7 +17,7 @@ export const CHAIN_SIGNATURES_CONFIG: Record<NearNetworkIds, ChainSignaturesConf
 export type CHAIN_TYPE = "BTC" | "EVM";
 
 export const CHAIN_SIGNATURES_DERIVATION_PATHS: Record<CHAIN_TYPE, string> = {
-    "BTC": "btc-1",
+    "BTC": "bitcoin-1",
     "EVM": "evm-1",
 }
 
