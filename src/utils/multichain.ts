@@ -17,8 +17,13 @@ export const CHAIN_SIGNATURES_CONFIG: Record<NearNetworkIds, ChainSignaturesConf
 export type CHAIN_TYPE = "BTC" | "EVM";
 
 export const CHAIN_SIGNATURES_DERIVATION_PATHS: Record<CHAIN_TYPE, string> = {
-    "BTC": "bitcoin-1",
+    "BTC": "btc-1",
     "EVM": "evm-1",
+}
+
+export const MEMPOOL_API_URL: Record<Exclude<BTCNetworkIds, "regtest">, string> = {
+    mainnet: "https://mempool.space/api",
+    testnet: "https://mempool.space/testnet4/api", // use testnet4 as testnet3 will be deprecated
 }
 
 export function getDerivationPath(chainType: CHAIN_TYPE): string {
@@ -28,7 +33,7 @@ export function getDerivationPath(chainType: CHAIN_TYPE): string {
 export function getBitcoinConfig(runtime: IAgentRuntime) {
     const nearNetworkId = runtime.getSetting("NEAR_NETWORK") as NearNetworkIds ?? "testnet";
     const providerUrl = runtime.getSetting("BTC_PROVIDER_URL") 
-        ?? (nearNetworkId === 'mainnet' ? "https://mempool.space/api" : "https://mempool.space/testnet4/api");
+        ?? (nearNetworkId === 'mainnet' ? MEMPOOL_API_URL.mainnet : MEMPOOL_API_URL.testnet);
     const network = runtime.getSetting("BTC_NETWORK") as BTCNetworkIds ?? "testnet";
     return {
         ...CHAIN_SIGNATURES_CONFIG[nearNetworkId],
