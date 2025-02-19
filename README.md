@@ -95,16 +95,16 @@ const result = await eliza.execute({
 
 ### Actions
 
-#### `CROSS_CHAIN_TRANSFER`
+#### `MULTI_CHAIN_TRANSFER`
 
-Transfers tokens between different blockchain networks.
+Transfers tokens on multiple chains with a single account
 
 ```typescript
 {
-  action: 'CROSS_CHAIN_TRANSFER',
+  action: 'MULTI_CHAIN_TRANSFER',
   content: {
-    sourceChain: string,     // Source blockchain (e.g., "BTC", "ETH", "COSMOS")
-    targetChain: string,     // Target blockchain
+    chain: string,           // The blockchain (e.g., "BTC", "ETH", "COSMOS")
+    networkId: string,       // The network of the blockchain (e.g. "mainnet", "testnet")
     token: string,           // Token to transfer
     amount: string,          // Amount to transfer
     recipient: string        // Recipient address on target chain
