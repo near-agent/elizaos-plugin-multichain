@@ -1,0 +1,29 @@
+{
+    "name": "@elizaos/plugin-multichain",
+    "version": "0.1.9",
+    "type": "module",
+    "main": "dist/index.js",
+    "module": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "dependencies": {
+        "@elizaos/core": "^0.1.9",
+        "bignumber.js": "9.1.2",
+        "multichain-tools": "^4.0.0",
+        "near-api-js": "5.0.1",
+        "node-cache": "5.1.2",
+        "tsup": "8.3.5",
+        "zod": "3.23.8"
+    },
+    "scripts": {
+        "build": "tsup --format esm,cjs --dts",
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "peerDependencies": {
+        "form-data": "4.0.1",
+        "whatwg-url": "7.1.0"
+    }
+}
