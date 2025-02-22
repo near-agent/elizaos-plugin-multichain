@@ -167,7 +167,7 @@ async function transfer(
     }
 }
 
-export const executeBtcTransfer: Action = {
+export const executeTransfer: Action = {
     name: "MULTI_CHAIN_TRANSFER_TOKEN",
     similes: ["MULTI_CHAIN_SEND_TOKEN", "MULTI_CHAIN_PAY_TOKEN"],
     validate: async (_runtime: IAgentRuntime, _message: Memory) => {
