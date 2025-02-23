@@ -1,6 +1,6 @@
 {
-    "name": "@elizaos/plugin-multichain",
-    "version": "0.1.9",
+    "name": "@near-agent/elizaos-plugin-multichain",
+    "version": "0.1.0-alpha.2",
     "type": "module",
     "main": "dist/index.js",
     "module": "dist/index.js",
