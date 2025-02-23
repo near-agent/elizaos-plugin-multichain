@@ -260,8 +260,8 @@ export const executeTransfer: Action = {
             {
                 user: "{{user2}}",
                 content: {
-                    text: "I'll send 0.001 ETH now...",
-                    action: "SEND_BTC",
+                    text: "I'll send 0.0001 BTC now...",
+                    action: "MULTI_CHAIN_SEND_TOKEN",
                 },
             },
             {
