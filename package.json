@@ -18,9 +18,10 @@
         "zod": "3.23.8"
     },
     "scripts": {
-        "build": "tsup --format esm,cjs --dts",
+        "build": "rm -rf dist && tsup --format esm,cjs --dts",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "prepublishOnly": "pnpm build"
     },
     "peerDependencies": {
         "form-data": "4.0.1",
