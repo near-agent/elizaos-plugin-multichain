@@ -26,5 +26,18 @@
     "peerDependencies": {
         "form-data": "4.0.1",
         "whatwg-url": "7.1.0"
+    },
+    "agentConfig": {
+        "pluginType": "elizaos:plugin:1.0.0",
+        "pluginParameters": {
+          "NEAR_ADDRESS": {
+            "type": "string",
+            "description": "NEAR signer account address"
+          },
+          "NEAR_WALLET_SECRET_KEY": {
+            "type": "string",
+            "description": "The private key of the NEAR signer account"
+          }
+        }
     }
 }
