@@ -15,7 +15,6 @@ node-compile-cache
 .zed
 .DS_Store
 
-dist/
 # Allow models directory but ignore model files
 models/*.gguf
 pgLite/
